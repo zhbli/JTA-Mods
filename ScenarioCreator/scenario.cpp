@@ -461,12 +461,12 @@ void ScenarioCreator::listen_for_keystrokes() {
 	}
 
 	if (menuActive) {
-		if (IsKeyJustUp(VK_NUMPAD5))							bEnter = true;
+		if (IsKeyJustUp(VK_RETURN))    							bEnter = true;
 		if (IsKeyJustUp(VK_NUMPAD0) || IsKeyJustUp(VK_BACK))	bBack = true;
-		if (IsKeyJustUp(VK_NUMPAD8))							bUp = true;
-		if (IsKeyJustUp(VK_NUMPAD2))							bDown = true;
-		if (IsKeyJustUp(VK_NUMPAD6))							bRight = true;
-		if (IsKeyJustUp(VK_NUMPAD4))							bLeft = true;
+		if (IsKeyJustUp(VK_UP))									bUp = true;
+		if (IsKeyJustUp(VK_DOWN))								bDown = true;
+		if (IsKeyJustUp(VK_RIGHT))								bRight = true;
+		if (IsKeyJustUp(VK_LEFT))								bLeft = true;
 	}
 
 
