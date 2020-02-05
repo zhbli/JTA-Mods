@@ -20,14 +20,18 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="dictionary.h" />
+    <ClInclude Include="export.h" />
     <ClInclude Include="keyboard.h" />
+    <ClInclude Include="MinHook.h" />
     <ClInclude Include="scenario.h" />
     <ClInclude Include="files.h" />
     <ClInclude Include="script.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="export.cpp" />
     <ClCompile Include="keyboard.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="main1.cpp1" />
     <ClCompile Include="scenario.cpp" />
     <ClCompile Include="script.cpp" />
   </ItemGroup>
@@ -35,7 +39,7 @@
     <VCProjectVersion>15.0</VCProjectVersion>
     <ProjectGuid>{DEFA6198-F774-4012-9C88-CCF79989DD15}</ProjectGuid>
     <RootNamespace>DatasetAnnotator</RootNamespace>
-    <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0.14393.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -94,11 +98,11 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\Users\zhbli\Documents\ScriptHookV_SDK_1.0.617.1a\inc</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\zhbli\Documents\projects\project1\opencv\build\include\opencv;C:\Users\zhbli\Documents\projects\project1\opencv\build\include;C:\Users\zhbli\Documents\ScriptHookV_SDK_1.0.617.1a\inc;C:\Users\zhbli\Documents\eigen-eigen-f562a193118d;C:\Users\zhbli\Documents\UniversalDXSDK\Include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <AdditionalLibraryDirectories>C:\Users\zhbli\Documents\ScriptHookV_SDK_1.0.617.1a\lib</AdditionalLibraryDirectories>
-      <AdditionalDependencies>ScriptHookV.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\Users\zhbli\Documents\ScriptHookV_SDK_1.0.617.1a\lib;C:\Users\zhbli\Documents\projects\project1\opencv\build\x64\vc14\lib</AdditionalLibraryDirectories>
+      <AdditionalDependencies>ScriptHookV.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;C:\Users\zhbli\Documents\projects\project1\libMinHook.x64.lib;%(AdditionalDependencies);opencv_ml2413d.lib;opencv_calib3d2413d.lib;opencv_contrib2413d.lib;opencv_core2413d.lib;opencv_features2d2413d.lib;opencv_flann2413d.lib;opencv_gpu2413d.lib;opencv_highgui2413d.lib;opencv_imgproc2413d.lib;opencv_legacy2413d.lib;opencv_objdetect2413d.lib;opencv_ts2413d.lib;opencv_video2413d.lib;opencv_nonfree2413d.lib;opencv_ocl2413d.lib;opencv_photo2413d.lib;opencv_stitching2413d.lib;opencv_superres2413d.lib;opencv_videostab2413d.lib</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
       <Command>xcopy /Y $(SolutionDir)$(Platform)\$(Configuration)\$(ProjectName).asi "C:\Program Files (x86)\Steam\steamapps\common\Grand Theft Auto V"</Command>

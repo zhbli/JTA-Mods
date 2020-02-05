@@ -12,6 +12,13 @@
 #include <time.h>
 #include <list>
 
+#include "export.h"
+#include <cv.h>
+#include <highgui.h>
+#include <opencv2/imgproc/imgproc.hpp>
+
+using namespace cv;
+
 #define SCREEN_WIDTH 1920
 #define SCREEN_HEIGHT 1080
 #define TIME_FACTOR 12.0
@@ -558,7 +565,7 @@ int DatasetAnnotator::update()
 			}
 		}
 	}
-	//save_frame();
+	save_frame();
 	nsample++;
 	if (nsample == max_samples) {
 		for (int i = 0; i < nwPeds; i++) {
@@ -629,6 +636,7 @@ void DatasetAnnotator::get_2D_from_3D(Vector3 v, float *x2d, float *y2d) {
 	*y2d = (0.5f - (d.z * (f / d.y)) / SCREEN_HEIGHT);
 }
 
+/*
 void DatasetAnnotator::save_frame() {
 	StretchBlt(hCaptureDC, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, hWindowDC, 0, 0, windowWidth, windowHeight, SRCCOPY | CAPTUREBLT);
 	Gdiplus::Bitmap image(hCaptureBitmap, (HPALETTE)0);
@@ -636,6 +644,16 @@ void DatasetAnnotator::save_frame() {
 	StringToWString(ws, output_path);
 
 	image.Save((ws + L"\\" + std::to_wstring(nsample) + L".jpeg").c_str(), &pngClsid, NULL);
+}
+*/
+
+void DatasetAnnotator::save_frame() {
+	std::string save_color_path = "C:\\Users\\zhbli\\Documents\\projects\\project1\\outputs\\0.jpg";
+	void *buf_color, *buf_bg;
+	int size = export_get_color_buffer(&buf_color);
+	Mat image_color(Size(1920, 1080), CV_8UC4, buf_color, Mat::AUTO_STEP);
+	cvtColor(image_color, image_color, CV_RGB2BGR);
+	imwrite(save_color_path, image_color);
 }
 
 void DatasetAnnotator::setCameraMoving(Vector3 A, Vector3 B, Vector3 C, int fov) {
