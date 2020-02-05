@@ -332,7 +332,7 @@ int DatasetAnnotator::update()
 		lastRecordingTime = std::clock();
 	else
 		return nsample;
-	GAMEPLAY::SET_TIME_SCALE(1.0f / (float)TIME_FACTOR);
+	//GAMEPLAY::SET_TIME_SCALE(1.0f / (float)TIME_FACTOR); //慢动作播放对我来说没有必要
 
 	PED::SET_PED_DENSITY_MULTIPLIER_THIS_FRAME(1.0);
 
@@ -558,7 +558,7 @@ int DatasetAnnotator::update()
 			}
 		}
 	}
-	save_frame();
+	//save_frame();
 	nsample++;
 	if (nsample == max_samples) {
 		for (int i = 0; i < nwPeds; i++) {
