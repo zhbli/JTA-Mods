@@ -31,7 +31,6 @@
     <ClCompile Include="export.cpp" />
     <ClCompile Include="keyboard.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="main1.cpp1" />
     <ClCompile Include="scenario.cpp" />
     <ClCompile Include="script.cpp" />
   </ItemGroup>

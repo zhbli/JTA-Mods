@@ -339,7 +339,7 @@ int DatasetAnnotator::update()
 		lastRecordingTime = std::clock();
 	else
 		return nsample;
-	//GAMEPLAY::SET_TIME_SCALE(1.0f / (float)TIME_FACTOR); //慢动作播放对我来说没有必要
+	GAMEPLAY::SET_TIME_SCALE(1.0f / (float)TIME_FACTOR);
 
 	PED::SET_PED_DENSITY_MULTIPLIER_THIS_FRAME(1.0);
 
@@ -655,6 +655,7 @@ void DatasetAnnotator::save_frame() {
 	cvtColor(image_color, image_color, CV_RGB2BGR);
 	imwrite(save_color_path, image_color);
 }
+
 
 void DatasetAnnotator::setCameraMoving(Vector3 A, Vector3 B, Vector3 C, int fov) {
 	
