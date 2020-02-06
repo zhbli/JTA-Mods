@@ -104,7 +104,7 @@ static void* targets;
 template<int offset, typename T>
 void hook_function(T* inst, void* hook, bool unhook = false)
 {
-	/*
+	
 	//__debugbreak();
 	void** vtbl = *reinterpret_cast<void***>(inst);
 	FILE* f = fopen("GTANativePlugin.log", "a");
@@ -146,7 +146,7 @@ void hook_function(T* inst, void* hook, bool unhook = false)
 	//fprintf(f, "clear_hook: %p\n", hook);
 	//fprintf(f, "clearFn: %p\n", (void*)(*(*reinterpret_cast<long long**>(inst) + 50)));
 	fclose(f);
-	*/
+	
 }
 
 template<int offset, typename T>

@@ -648,12 +648,39 @@ void DatasetAnnotator::save_frame() {
 */
 
 void DatasetAnnotator::save_frame() {
+	//定义变量
+	int width = 1024; int height = 768;
 	std::string save_color_path = "C:\\Users\\zhbli\\Documents\\projects\\project1\\outputs\\0.jpg";
-	void *buf_color, *buf_bg;
-	int size = export_get_color_buffer(&buf_color);
-	Mat image_color(Size(1920, 1080), CV_8UC4, buf_color, Mat::AUTO_STEP);
+	std::string save_mask_path = "C:\\Users\\zhbli\\Documents\\projects\\project1\\outputs\\1.png"; //说明：二值图像的png比jpg小很多，且无损。
+	void *buf_color; //说明：不要共用buf。有时前一个buf获取成功，后一个buf获取失败。但是共用的话你就不知道后一个失败了。
+	//抓取RGB
+	int size_color = export_get_color_buffer(&buf_color);
+	Mat image_color(Size(width, height), CV_8UC4, buf_color, Mat::AUTO_STEP);
 	cvtColor(image_color, image_color, CV_RGB2BGR);
 	imwrite(save_color_path, image_color);
+
+	//抓取mask
+	void *buf_mask;
+	int size_mask = export_get_stencil_buffer(&buf_mask);
+	if (size_mask <= 0)
+	{
+	}
+	Mat image(Size(width, height), CV_8UC1, buf_mask, Mat::AUTO_STEP);
+	for (int y = 0; y < height; y++)
+	{
+		for (int x = 0; x < width; x++)
+		{
+			if (image.at<uchar>(y, x) == 1)
+			{
+				image.at<uchar>(y, x) = 255;
+			}
+			else
+			{
+				image.at<uchar>(y, x) = 0;
+			}
+		}
+	}
+	imwrite(save_mask_path, image);
 }
 
 
