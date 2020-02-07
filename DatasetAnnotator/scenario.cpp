@@ -339,7 +339,7 @@ int DatasetAnnotator::update()
 		lastRecordingTime = std::clock();
 	else
 		return nsample;
-	GAMEPLAY::SET_TIME_SCALE(1.0f / (float)TIME_FACTOR);
+	//GAMEPLAY::SET_TIME_SCALE(1.0f / (float)TIME_FACTOR);//不应进入慢动作
 
 	PED::SET_PED_DENSITY_MULTIPLIER_THIS_FRAME(1.0);
 
@@ -565,7 +565,14 @@ int DatasetAnnotator::update()
 			}
 		}
 	}
+	//ISSUE #34
+	GAMEPLAY::SET_TIME_SCALE(0);
+	GAMEPLAY::SET_GAME_PAUSED(TRUE); //处理一帧时，先让该画面暂停
 	save_frame();
+	//ISSUE #34
+	WAIT(1);
+	GAMEPLAY::SET_TIME_SCALE(1);
+	GAMEPLAY::SET_GAME_PAUSED(FALSE); //该帧处理完成时，取消暂停
 	nsample++;
 	if (nsample == max_samples) {
 		for (int i = 0; i < nwPeds; i++) {
@@ -647,11 +654,17 @@ void DatasetAnnotator::save_frame() {
 }
 */
 
+int frame_id = 0;
 void DatasetAnnotator::save_frame() {
 	//定义变量
 	int width = 1024; int height = 768;
-	std::string save_color_path = "C:\\Users\\zhbli\\Documents\\projects\\project1\\outputs\\0.jpg";
-	std::string save_mask_path = "C:\\Users\\zhbli\\Documents\\projects\\project1\\outputs\\1.png"; //说明：二值图像的png比jpg小很多，且无损。
+	char frame_name[10];
+	sprintf(frame_name, "%06d", frame_id);
+	string fram_name_s(frame_name);
+	std::string frame_dir = "C:\\Users\\zhbli\\Documents\\projects\\project1\\outputs\\" + fram_name_s + "\\";//每帧保存一个文件夹。
+	//创建文件夹
+	_mkdir(frame_dir.c_str());
+	std::string save_color_path = frame_dir + "color.jpg";
 	void *buf_color; //说明：不要共用buf。有时前一个buf获取成功，后一个buf获取失败。但是共用的话你就不知道后一个失败了。
 	//抓取RGB
 	int size_color = export_get_color_buffer(&buf_color);
@@ -660,27 +673,51 @@ void DatasetAnnotator::save_frame() {
 	imwrite(save_color_path, image_color);
 
 	//抓取mask
-	void *buf_mask;
-	int size_mask = export_get_stencil_buffer(&buf_mask);
-	if (size_mask <= 0)
+	//显隐各人
+	//先全隐藏
+	for (int i = 0; i < nwPeds; i++) //for every ped
 	{
+		ENTITY::SET_ENTITY_VISIBLE(wPeds[i].ped, FALSE, TRUE);//first, hide it
 	}
-	Mat image(Size(width, height), CV_8UC1, buf_mask, Mat::AUTO_STEP);
-	for (int y = 0; y < height; y++)
+	for (int i = 0; i < nwPeds; i++) //for every ped
 	{
-		for (int x = 0; x < width; x++)
+		ENTITY::SET_ENTITY_VISIBLE(wPeds[i].ped, TRUE, TRUE);//仅显示当前的人
+		WAIT(10);//必须要等待，使得人能够载入到画面中。
+		
+		//捕获mask
+		std::string save_mask_path = frame_dir + std::to_string(i) + ".png"; //说明：二值图像的png比jpg小很多，且无损。
+		void *buf_mask;
+		WAIT(100);//使得显卡内容能够跟上RGB的内容。
+		int size_mask = export_get_stencil_buffer(&buf_mask);
+		if (size_mask <= 0)
 		{
-			if (image.at<uchar>(y, x) == 1)
+			save_mask_path = save_mask_path + "bad";
+		}
+		Mat image(Size(width, height), CV_8UC1, buf_mask, Mat::AUTO_STEP);
+		for (int y = 0; y < height; y++)
+		{
+			for (int x = 0; x < width; x++)
 			{
-				image.at<uchar>(y, x) = 255;
-			}
-			else
-			{
-				image.at<uchar>(y, x) = 0;
+				if (image.at<uchar>(y, x) == 1)
+				{
+					image.at<uchar>(y, x) = 255;
+				}
+				else
+				{
+					image.at<uchar>(y, x) = 0;
+				}
 			}
 		}
+		imwrite(save_mask_path, image);
+		
+		ENTITY::SET_ENTITY_VISIBLE(wPeds[i].ped, FALSE, TRUE);//隐藏当前的人。此时画面中是没有任何人的。
 	}
-	imwrite(save_mask_path, image);
+	//处理完该帧后，把人再全显示出来
+	for (int i = 0; i < nwPeds; i++) //for every ped
+	{
+		ENTITY::SET_ENTITY_VISIBLE(wPeds[i].ped, TRUE, TRUE);
+	}
+	frame_id = frame_id + 1;
 }
 
 
