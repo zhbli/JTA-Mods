@@ -332,8 +332,10 @@ DatasetAnnotator::~DatasetAnnotator()
 	log_file.close();
 }
 
+std::ofstream strm1("logme1.txt");
 int DatasetAnnotator::update()
 {
+	strm1 << "----enter <update>\n" << std::flush;
 	float delay = ((float)(std::clock() - lastRecordingTime)) / CLOCKS_PER_SEC;
 	if (delay >= recordingPeriod)
 		lastRecordingTime = std::clock();
@@ -568,11 +570,13 @@ int DatasetAnnotator::update()
 	//ISSUE #34
 	GAMEPLAY::SET_TIME_SCALE(0);
 	GAMEPLAY::SET_GAME_PAUSED(TRUE); //处理一帧时，先让该画面暂停
+	WAIT(200);//总感觉还有一定程度的对不齐。在这里等会试试。
 	save_frame();
 	//ISSUE #34
 	WAIT(1);
 	GAMEPLAY::SET_TIME_SCALE(1);
 	GAMEPLAY::SET_GAME_PAUSED(FALSE); //该帧处理完成时，取消暂停
+	WAIT(50);//处理下一帧时，让人走一会，走50ms，则帧率为20fps。
 	nsample++;
 	if (nsample == max_samples) {
 		for (int i = 0; i < nwPeds; i++) {
@@ -584,6 +588,7 @@ int DatasetAnnotator::update()
 	}
 
 	return nsample;
+	strm1 << "----exit <update>\n" << std::flush;
 }
 
 void DatasetAnnotator::addwPed(Ped p, Vector3 from, Vector3 to, int stop, float spd)
@@ -656,6 +661,7 @@ void DatasetAnnotator::save_frame() {
 
 int frame_id = 0;
 void DatasetAnnotator::save_frame() {
+	strm1 << frame_id << "enter <save_frame>\n" << std::flush;
 	//定义变量
 	int width = 1024; int height = 768;
 	char frame_name[10];
@@ -671,7 +677,7 @@ void DatasetAnnotator::save_frame() {
 	Mat image_color(Size(width, height), CV_8UC4, buf_color, Mat::AUTO_STEP);
 	cvtColor(image_color, image_color, CV_RGB2BGR);
 	imwrite(save_color_path, image_color);
-
+	strm1 << "tag1\n" << std::flush;
 	//抓取mask
 	//显隐各人
 	//先全隐藏
@@ -679,44 +685,77 @@ void DatasetAnnotator::save_frame() {
 	{
 		ENTITY::SET_ENTITY_VISIBLE(wPeds[i].ped, FALSE, TRUE);//first, hide it
 	}
+	//保存背景
+	std::string save_background_path = frame_dir + "background.png"; //说明：二值图像的png比jpg小很多，且无损。
+	void *buf_bg;
+	WAIT(200);//使得显卡内容能够跟上RGB的内容。
+	int size_bg = export_get_stencil_buffer(&buf_bg);
+	Mat image_bg(Size(width, height), CV_8UC1, buf_bg, Mat::AUTO_STEP);
+	for (int y = 0; y < height; y++)
+	{
+		for (int x = 0; x < width; x++)
+		{
+			if (image_bg.at<uchar>(y, x) == 1)
+			{
+				image_bg.at<uchar>(y, x) = 255;
+			}
+			else
+			{
+				image_bg.at<uchar>(y, x) = 0;
+			}
+		}
+	}
+	imwrite(save_background_path, image_bg);
+	//保存每个人
 	for (int i = 0; i < nwPeds; i++) //for every ped
 	{
+		strm1 << "--" << i << " 1.1(in)\n" << std::flush;
 		ENTITY::SET_ENTITY_VISIBLE(wPeds[i].ped, TRUE, TRUE);//仅显示当前的人
-		WAIT(10);//必须要等待，使得人能够载入到画面中。
+		WAIT(200);//必须要等待，使得人能够载入到画面中。
 		
 		//捕获mask
 		std::string save_mask_path = frame_dir + std::to_string(i) + ".png"; //说明：二值图像的png比jpg小很多，且无损。
 		void *buf_mask;
-		WAIT(100);//使得显卡内容能够跟上RGB的内容。
+		WAIT(200);//使得显卡内容能够跟上RGB的内容。
 		int size_mask = export_get_stencil_buffer(&buf_mask);
+		strm1 << "--" << i << " 1.2\n" << std::flush;
 		if (size_mask <= 0)
 		{
-			save_mask_path = save_mask_path + "bad";
+			strm1 << "--" << i << " bug\n" << std::flush;
+			//save_mask_path = save_mask_path + "bad";
+			//imwrite(save_mask_path, image_color);
 		}
-		Mat image(Size(width, height), CV_8UC1, buf_mask, Mat::AUTO_STEP);
-		for (int y = 0; y < height; y++)
+		else
 		{
-			for (int x = 0; x < width; x++)
+			Mat image(Size(width, height), CV_8UC1, buf_mask, Mat::AUTO_STEP);
+			for (int y = 0; y < height; y++)
 			{
-				if (image.at<uchar>(y, x) == 1)
+				for (int x = 0; x < width; x++)
 				{
-					image.at<uchar>(y, x) = 255;
-				}
-				else
-				{
-					image.at<uchar>(y, x) = 0;
+					if (image.at<uchar>(y, x) == 1)
+					{
+						image.at<uchar>(y, x) = 255;
+					}
+					else
+					{
+						image.at<uchar>(y, x) = 0;
+					}
 				}
 			}
+			strm1 << "--" << i << " 1.3\n" << std::flush;
+			imwrite(save_mask_path, image);
 		}
-		imwrite(save_mask_path, image);
 		
 		ENTITY::SET_ENTITY_VISIBLE(wPeds[i].ped, FALSE, TRUE);//隐藏当前的人。此时画面中是没有任何人的。
+		strm1 << "--" << i << " 1.4(out)\n" << std::flush;
 	}
 	//处理完该帧后，把人再全显示出来
 	for (int i = 0; i < nwPeds; i++) //for every ped
 	{
 		ENTITY::SET_ENTITY_VISIBLE(wPeds[i].ped, TRUE, TRUE);
 	}
+	WAIT(200);//必须要等待，否则可能人来不及显示在画面上。
+	strm1 << frame_id << "exit <save_frame>\n" << std::flush;
 	frame_id = frame_id + 1;
 }
 
