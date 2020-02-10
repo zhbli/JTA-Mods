@@ -12,6 +12,9 @@
 #include <list>
 #include <experimental/filesystem>
 #include "keyboard.h"
+#include <iomanip>
+#include <ctime>
+#include <sstream>
 
 DWORD	vehUpdateTime;
 DWORD	pedUpdateTime;
@@ -20,8 +23,8 @@ namespace fs = std::experimental::filesystem;
 
 
 void record() {
-	char path[] = "JTA\\";
-	char scenarios_path[] = "JTA-Scenarios\\";
+	char path[] = "AmodalMOTS\\";
+	char scenarios_path[] = "AmodalMOTS-Scenarios\\";
 
 	_mkdir(path);
 
@@ -33,46 +36,40 @@ void record() {
 	// Day sequences
 	for (auto &p : fs::recursive_directory_iterator(scenarios_path)) {
 		if (fs::is_regular_file(p)) {
-			int nsamples = 0;
-			std::string output_path = std::string(path) + std::string("seq_") + std::to_string(seq_number);
+			//生成时间戳
+			time_t time_seconds = time(0);
+			struct tm now_time;
+			localtime_s(&now_time, &time_seconds);
+			char time[80];
+			sprintf_s(time, "%02d%02d%02d%02d", now_time.tm_mon + 1, now_time.tm_mday, now_time.tm_hour, now_time.tm_min);
+			std::string time_str(time);
+			//将数据Scenarios文件拷贝到output_path中
+			std::string output_path = std::string(path) + time_str;
 			_mkdir(output_path.c_str());
+			fs::copy(p, output_path);
+			int nsamples = 0;
 			S = new DatasetAnnotator(output_path, p.path().string().c_str(), max_samples, 0);
 			Sleep(10);
+			int frame_id = 1;
 			while (nsamples < max_samples) {
-				nsamples = (*S).update();
+				nsamples = (*S).update(frame_id);
+				if (nsamples > 0)  //因为update刚开始会空转一会。
+				{
+					frame_id = frame_id + 1;
+				}
 				WAIT(0);
 			}
 			delete static_cast <DatasetAnnotator *>(S);
 			seq_number++;
 		}
 	}
-
-	// Night sequences
-	for (auto &p : fs::recursive_directory_iterator(scenarios_path)) {
-		if (fs::is_regular_file(p)) {
-			int nsamples = 0;
-			std::string output_path = std::string(path) + std::string("\\seq_") + std::to_string(seq_number);
-			_mkdir(output_path.c_str());
-			S = new DatasetAnnotator(output_path, p.path().string().c_str(), max_samples, 1);
-			Sleep(10);
-			while (nsamples < max_samples) {
-				nsamples = (*S).update();
-				WAIT(0);
-			}
-			delete static_cast <DatasetAnnotator *>(S);
-			seq_number++;
-		}
-	}
-
 }
 
 
 void main()
 {	
-	std::ofstream strm("logme.txt");
 	while (true) {
 		if (IsKeyJustUp(VK_F8)) {
-			strm << "gg\n";
 			record();
 		}
 		WAIT(0);

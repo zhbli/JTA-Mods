@@ -182,10 +182,7 @@ DatasetAnnotator::DatasetAnnotator(std::string _output_path, const char* _file_s
 
 	// inizialize the coords_file used to storage coords data
 	log_file.open(output_path + "\\log.txt");
-	coords_file.open(output_path + "\\coords.csv");
-	coords_file << "frame,pedestrian_id,joint_type,2D_x,2D_y,3D_x,3D_y,3D_z,occluded,self_occluded,";
-	coords_file << "cam_3D_x,cam_3D_y,cam_3D_z,cam_rot_x,cam_rot_y,cam_rot_z,fov\n";
-
+	
 	this->player = PLAYER::PLAYER_ID();
 	this->playerPed = PLAYER::PLAYER_PED_ID();
 	this->line = "";
@@ -328,14 +325,11 @@ DatasetAnnotator::~DatasetAnnotator()
 	ReleaseDC(hWnd, hWindowDC);
 	DeleteDC(hCaptureDC);
 	DeleteObject(hCaptureBitmap);
-	coords_file.close();
 	log_file.close();
 }
 
-std::ofstream strm1("logme1.txt");
-int DatasetAnnotator::update()
+int DatasetAnnotator::update(int frame_id)
 {
-	strm1 << "----enter <update>\n" << std::flush;
 	float delay = ((float)(std::clock() - lastRecordingTime)) / CLOCKS_PER_SEC;
 	if (delay >= recordingPeriod)
 		lastRecordingTime = std::clock();
@@ -392,191 +386,17 @@ int DatasetAnnotator::update()
 		//this->cam_rot = ped_with_cam_rot;
 	}
 
-	//this->cam_coords = CAM::GET_GAMEPLAY_CAM_COORD();
-	//this->cam_rot = CAM::GET_GAMEPLAY_CAM_ROT(2);
-	//this->fov = CAM::GET_GAMEPLAY_CAM_FOV();
-
-	// scan all the pedestrians taken
-	for (int i = 0; i < number_of_peds; i++){
-
-		// ignore pedestrians in vehicles or dead pedestrians
-		if(PED::IS_PED_IN_ANY_VEHICLE(peds[i], TRUE) || PED::IS_PED_DEAD_OR_DYING(peds[i], TRUE)) {
-			//log_file << "veicolo o morto\n";
-			continue;
-		}
-		// ignore player
-		else if (PED::IS_PED_A_PLAYER(peds[i])) {
-			//log_file << "player\n";
-			continue;
-		}
-		else if (!ENTITY::IS_ENTITY_ON_SCREEN(peds[i])) {
-			//log_file << "non su schermo\n";
-			continue;
-		}
-		else if (!PED::IS_PED_HUMAN(peds[i])) {
-			//log_file << "non umano\n";
-			continue;
-		}
-		else if (!ENTITY::IS_ENTITY_VISIBLE(peds[i])) {
-			//log_file << "invisibile\n";
-			continue;
-		}
-
-		Vector3 ped_coords = ENTITY::GET_ENTITY_COORDS(peds[i], TRUE);
-		float ped2cam_distance = GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(
-			cam_coords.x, cam_coords.y, cam_coords.z, 
-			ped_coords.x, ped_coords.y, ped_coords.z, 1
-		);
-
-		if (ped2cam_distance < MAX_PED_TO_CAM_DISTANCE) {
-			
-			// for each pedestrians scan all the joint_ID we choose on the subset
-			for (int n = -1; n < number_of_joints; n++) {
-
-				Vector3 joint_coords;
-				if (n == -1) {
-					Vector3 head_coords = ENTITY::GET_WORLD_POSITION_OF_ENTITY_BONE(peds[i], PED::GET_PED_BONE_INDEX(peds[i], joint_int_codes[0]));
-					Vector3 neck_coords = ENTITY::GET_WORLD_POSITION_OF_ENTITY_BONE(peds[i], PED::GET_PED_BONE_INDEX(peds[i], joint_int_codes[1]));
-					float head_neck_norm = GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(neck_coords.x, neck_coords.y, neck_coords.z, head_coords.x, head_coords.y, head_coords.z, 1);
-					float dx = (head_coords.x - neck_coords.x) / head_neck_norm;
-					float dy = (head_coords.y - neck_coords.y) / head_neck_norm;
-					float dz = (head_coords.z - neck_coords.z) / head_neck_norm;
-
-					joint_coords.x = head_coords.x + head_neck_norm * dx;
-					joint_coords.y = head_coords.y + head_neck_norm * dy;
-					joint_coords.z = head_coords.z + head_neck_norm * dz;
-				}
-				else 
-					joint_coords = ENTITY::GET_WORLD_POSITION_OF_ENTITY_BONE(peds[i], PED::GET_PED_BONE_INDEX(peds[i], joint_int_codes[n]));
-				
-				// finding the versor (dx, dy, dz) pointing from the joint to the cam
-				float joint2cam_distance = GAMEPLAY::GET_DISTANCE_BETWEEN_COORDS(
-					joint_coords.x, joint_coords.y, joint_coords.z, 
-					cam_coords.x, cam_coords.y, cam_coords.z, 1
-				);
-				float dx = (cam_coords.x - joint_coords.x) / joint2cam_distance;
-				float dy = (cam_coords.y - joint_coords.y) / joint2cam_distance;
-				float dz = (cam_coords.z - joint_coords.z) / joint2cam_distance;
-
-				// ray #1: from joint to cam_coords (ignoring the pedestrian to whom the joint belongs and intersecting only pedestrian (8))
-				// ==> useful for detecting occlusions of pedestrian
-				Vector3 end_coords1, surface_norm1;
-				BOOL occlusion_ped;
-				Entity entityHit1 = 0;
-
-				int ray_ped_occlusion = WORLDPROBE::_CAST_RAY_POINT_TO_POINT(
-					joint_coords.x, joint_coords.y, joint_coords.z,
-					cam_coords.x, cam_coords.y, cam_coords.z,
-					8, peds[i], 7
-				);
-				WORLDPROBE::_GET_RAYCAST_RESULT(ray_ped_occlusion, &occlusion_ped, &end_coords1, &surface_norm1, &entityHit1);
-
-				if (entityHit1 == ped_with_cam)
-					occlusion_ped = FALSE;
-
-
-				// ray #2: from joint to camera (without ignoring the pedestrian to whom the joint belongs and intersecting only pedestrian (8))
-				// ==> useful for detecting self-occlusions
-				Vector3 endCoords2, surfaceNormal2;
-				BOOL occlusion_self;
-				Entity entityHit2 = 0;
-				int ray_joint2cam = WORLDPROBE::_CAST_RAY_POINT_TO_POINT(
-					joint_coords.x + 0.1f*dx, joint_coords.y + 0.1f*dy, joint_coords.z + 0.1f*dz,
-					cam_coords.x, cam_coords.y, cam_coords.z, 
-					8, 0, 7
-				);
-				WORLDPROBE::_GET_RAYCAST_RESULT(ray_joint2cam, &occlusion_self, &endCoords2, &surfaceNormal2, &entityHit2);
-
-				if (entityHit2 == ped_with_cam)
-					occlusion_self = FALSE;
-
-
-				// ray #3: from camera to joint (ignoring the pedestrian to whom the joint belongs and intersecting everything but peds (4 and 8))
-				// ==> useful for detecting occlusions with objects
-				Vector3 endCoords3, surfaceNormal3;
-				BOOL occlusion_object;
-				Entity entityHit3 = 0;
-				int ray_joint2cam_obj = WORLDPROBE::_CAST_RAY_POINT_TO_POINT(
-					cam_coords.x, cam_coords.y, cam_coords.z,
-					joint_coords.x, joint_coords.y, joint_coords.z,
-					(~0 ^ (8|4)), peds[i], 7
-					);
-				WORLDPROBE::_GET_RAYCAST_RESULT(ray_joint2cam_obj, &occlusion_object, &endCoords3, &surfaceNormal3, &entityHit3);
-
-				
-				BOOL occluded = occlusion_ped || occlusion_object;
-
-
-				if (DISPLAY_FLAG) {
-					float x, y;
-					get_2D_from_3D(joint_coords, &x, &y);
-
-					// C calculation based on distance between the current pedestrians and the camera
-					if (ped2cam_distance > 6)
-						C = (float)(1.5 / cbrt(ped2cam_distance));
-					else
-						C = 1;
-
-					if (occluded) {
-						/*GRAPHICS::DRAW_BOX(
-						joint_coords.x, joint_coords.y, joint_coords.z,
-						joint_coords.x + 0.1, joint_coords.y + 0.1, joint_coords.z + 0.1,
-						255, 0, 64, 175
-						);*/
-						GRAPHICS::DRAW_RECT(x, y, 0.005f*C, 0.005f*C, 255, 0, 64, 175);
-					}
-					else if (occlusion_self) {
-						/*GRAPHICS::DRAW_BOX(
-							joint_coords.x, joint_coords.y, joint_coords.z,
-							joint_coords.x + 0.1, joint_coords.y + 0.1, joint_coords.z + 0.1,
-							255, 128, 16, 175
-							);*/
-						GRAPHICS::DRAW_RECT(x, y, 0.005f*C, 0.005f*C, 255, 128, 16, 175);
-					}
-					else {
-						/*GRAPHICS::DRAW_BOX(
-							joint_coords.x, joint_coords.y, joint_coords.z,
-							joint_coords.x + 0.1, joint_coords.y + 0.1, joint_coords.z + 0.1,
-							0, 255, 64, 175
-							);*/
-						GRAPHICS::DRAW_RECT(x, y, 0.005f*C, 0.005f*C, 0, 255, 64, 175);
-					}
-				}
-				float x, y;
-				get_2D_from_3D(joint_coords, &x, &y);
-				x = x * SCREEN_WIDTH;
-				y = y * SCREEN_HEIGHT;
-				coords_file << nsample;					  // frame number
-				coords_file << "," << peds[i];			  // pedestrian ID
-				coords_file << "," << n+1;				  // joint type
-				coords_file << "," << x;				  // camera 2D x [px]
-				coords_file << "," << y;	              // camera 2D y [px]
-				coords_file << "," << joint_coords.x;	  // joint 3D x [m]
-				coords_file << "," << joint_coords.y;	  // joint 3D y [m]
-				coords_file << "," << joint_coords.z;	  // joint 3D z [m]
-				coords_file << "," << occluded;			  // is joint occluded?
-				coords_file << "," << occlusion_self;	  // is joint self-occluded?
-				coords_file << "," << cam_coords.x;		  // camera 3D x [m]
-				coords_file << "," << cam_coords.y;	      // camera 3D y [m]
-				coords_file << "," << cam_coords.z;	      // camera 3D z [m]
-				coords_file << "," << cam_rot.x;		  // camera 3D rotation x [degrees]
-				coords_file << "," << cam_rot.y;	      // camera 3D rotation y [degrees]
-				coords_file << "," << cam_rot.z;	      // camera 3D rotation z [degrees]
-				coords_file << "," << fov;				  // camera FOV  [degrees]
-				coords_file << "\n";
-			}
-		}
-	}
 	//ISSUE #34
 	GAMEPLAY::SET_TIME_SCALE(0);
 	GAMEPLAY::SET_GAME_PAUSED(TRUE); //处理一帧时，先让该画面暂停
 	WAIT(200);//总感觉还有一定程度的对不齐。在这里等会试试。
-	save_frame();
+	save_frame(frame_id, peds, number_of_peds);
 	//ISSUE #34
 	WAIT(1);
 	GAMEPLAY::SET_TIME_SCALE(1);
 	GAMEPLAY::SET_GAME_PAUSED(FALSE); //该帧处理完成时，取消暂停
-	WAIT(50);//处理下一帧时，让人走一会，走50ms，则帧率为20fps。
+	//WAIT(50);//处理下一帧时，让人走一会，走50ms，则帧率为20fps。
+	WAIT(20);//感觉人走的有些快了，等待的时间短一些吧。
 	nsample++;
 	if (nsample == max_samples) {
 		for (int i = 0; i < nwPeds; i++) {
@@ -588,7 +408,6 @@ int DatasetAnnotator::update()
 	}
 
 	return nsample;
-	strm1 << "----exit <update>\n" << std::flush;
 }
 
 void DatasetAnnotator::addwPed(Ped p, Vector3 from, Vector3 to, int stop, float spd)
@@ -659,67 +478,79 @@ void DatasetAnnotator::save_frame() {
 }
 */
 
-int frame_id = 0;
-void DatasetAnnotator::save_frame() {
-	strm1 << frame_id << "enter <save_frame>\n" << std::flush;
+void DatasetAnnotator::save_frame(int frame_id, int *Peds, int number_of_peds) {
+	log_file << frame_id << "enter <save_frame>\n" << std::flush;
 	//定义变量
 	int width = 1024; int height = 768;
 	char frame_name[10];
 	sprintf(frame_name, "%06d", frame_id);
 	string fram_name_s(frame_name);
-	std::string frame_dir = "C:\\Users\\zhbli\\Documents\\projects\\project1\\outputs\\" + fram_name_s + "\\";//每帧保存一个文件夹。
+	std::string frame_dir = output_path + "\\" + fram_name_s + "\\";//每帧保存一个文件夹。
 	//创建文件夹
 	_mkdir(frame_dir.c_str());
-	std::string save_color_path = frame_dir + "color.jpg";
+	std::string save_color_path = frame_dir + fram_name_s + ".jpg";
 	void *buf_color; //说明：不要共用buf。有时前一个buf获取成功，后一个buf获取失败。但是共用的话你就不知道后一个失败了。
 	//抓取RGB
-	strm1 << "tag0\n" << std::flush;
+	log_file << "tag0\n" << std::flush;
 	int size_color = export_get_color_buffer(&buf_color);
-	if (size_color <= 0)
+	while (size_color <= 0)
 	{
-		strm1 << " bug0\n" << std::flush;
+		log_file << " bug_color\n" << std::flush;
+		size_color = export_get_color_buffer(&buf_color);
+		WAIT(200);
 	}
-	else
-	{
-		Mat image_color(Size(width, height), CV_8UC4, buf_color, Mat::AUTO_STEP);
-		cvtColor(image_color, image_color, CV_RGB2BGR);
-		imwrite(save_color_path, image_color);
-		strm1 << "tag1\n" << std::flush;
-	}
+	Mat image_color(Size(width, height), CV_8UC4, buf_color, Mat::AUTO_STEP);
+	cvtColor(image_color, image_color, CV_RGB2BGR);
+	imwrite(save_color_path, image_color);
+	log_file << "tag1\n" << std::flush;
 
 	//抓取mask
 	//显隐各人
 	//先全隐藏
-	for (int i = 0; i < nwPeds; i++) //for every ped
+	for (int i = 0; i < number_of_peds; i++) //for every ped
 	{
-		ENTITY::SET_ENTITY_VISIBLE(wPeds[i].ped, FALSE, TRUE);//first, hide it
+		ENTITY::SET_ENTITY_VISIBLE(Peds[i], FALSE, TRUE);//first, hide it
 	}
+	/*由于使用worldGetAllPeds，所以画面中的每个人都会被我捕获。
 	//保存背景
 	std::string save_background_path = frame_dir + "background.png"; //说明：二值图像的png比jpg小很多，且无损。
 	void *buf_bg;
 	WAIT(200);//使得显卡内容能够跟上RGB的内容。
 	int size_bg = export_get_stencil_buffer(&buf_bg);
-	Mat image_bg(Size(width, height), CV_8UC1, buf_bg, Mat::AUTO_STEP);
-	for (int y = 0; y < height; y++)
+	if (size_bg <= 0)
 	{
-		for (int x = 0; x < width; x++)
+		log_file << " bug_bg" << std::flush;
+	}
+	else
+	{
+		Mat image_bg(Size(width, height), CV_8UC1, buf_bg, Mat::AUTO_STEP);
+		for (int y = 0; y < height; y++)
 		{
-			if (image_bg.at<uchar>(y, x) == 1)
+			for (int x = 0; x < width; x++)
 			{
-				image_bg.at<uchar>(y, x) = 255;
-			}
-			else
-			{
-				image_bg.at<uchar>(y, x) = 0;
+				if (image_bg.at<uchar>(y, x) == 1)
+				{
+					image_bg.at<uchar>(y, x) = 255;
+				}
+				else
+				{
+					image_bg.at<uchar>(y, x) = 0;
+				}
 			}
 		}
+		imwrite(save_background_path, image_bg);
+		log_file << "tag2\n" << std::flush;
 	}
-	imwrite(save_background_path, image_bg);
+	*/
 	//保存每个人
-	for (int i = 0; i < nwPeds; i++) //for every ped
+	for (int i = 0; i < number_of_peds; i++) //for every ped
 	{
-		strm1 << "--" << i << " 1.1(in)\n" << std::flush;
-		ENTITY::SET_ENTITY_VISIBLE(wPeds[i].ped, TRUE, TRUE);//仅显示当前的人
+		//如果这个人在屏幕上不可见，则什么也不做
+		if (!ENTITY::IS_ENTITY_ON_SCREEN(Peds[i]))
+		{
+			continue;
+		}
+		ENTITY::SET_ENTITY_VISIBLE(Peds[i], TRUE, TRUE);//仅显示当前的人
 		WAIT(200);//必须要等待，使得人能够载入到画面中。
 		
 		//捕获mask
@@ -727,45 +558,38 @@ void DatasetAnnotator::save_frame() {
 		void *buf_mask;
 		WAIT(200);//使得显卡内容能够跟上RGB的内容。
 		int size_mask = export_get_stencil_buffer(&buf_mask);
-		strm1 << "--" << i << " 1.2\n" << std::flush;
-		if (size_mask <= 0)
+		while (size_mask <= 0)
 		{
-			strm1 << "--" << i << " bug\n" << std::flush;
-			//save_mask_path = save_mask_path + "bad";
-			//imwrite(save_mask_path, image_color);
+			log_file << "--" << i << " bug_mask\n" << std::flush;
+			size_mask = export_get_stencil_buffer(&buf_mask);
+			WAIT(200);
 		}
-		else
+		Mat image(Size(width, height), CV_8UC1, buf_mask, Mat::AUTO_STEP);
+		for (int y = 0; y < height; y++)
 		{
-			Mat image(Size(width, height), CV_8UC1, buf_mask, Mat::AUTO_STEP);
-			for (int y = 0; y < height; y++)
+			for (int x = 0; x < width; x++)
 			{
-				for (int x = 0; x < width; x++)
+				if (image.at<uchar>(y, x) == 1)
 				{
-					if (image.at<uchar>(y, x) == 1)
-					{
-						image.at<uchar>(y, x) = 255;
-					}
-					else
-					{
-						image.at<uchar>(y, x) = 0;
-					}
+					image.at<uchar>(y, x) = 255;
+				}
+				else
+				{
+					image.at<uchar>(y, x) = 0;
 				}
 			}
-			strm1 << "--" << i << " 1.3\n" << std::flush;
-			imwrite(save_mask_path, image);
 		}
+		imwrite(save_mask_path, image);
 		
-		ENTITY::SET_ENTITY_VISIBLE(wPeds[i].ped, FALSE, TRUE);//隐藏当前的人。此时画面中是没有任何人的。
-		strm1 << "--" << i << " 1.4(out)\n" << std::flush;
+		ENTITY::SET_ENTITY_VISIBLE(Peds[i], FALSE, TRUE);//隐藏当前的人。此时画面中是没有任何人的。
 	}
 	//处理完该帧后，把人再全显示出来
-	for (int i = 0; i < nwPeds; i++) //for every ped
+	for (int i = 0; i < number_of_peds; i++) //for every ped
 	{
-		ENTITY::SET_ENTITY_VISIBLE(wPeds[i].ped, TRUE, TRUE);
+		ENTITY::SET_ENTITY_VISIBLE(Peds[i], TRUE, TRUE);
 	}
 	WAIT(200);//必须要等待，否则可能人来不及显示在画面上。
-	strm1 << frame_id << "exit <save_frame>\n" << std::flush;
-	frame_id = frame_id + 1;
+	log_file << frame_id << "exit <save_frame>\n" << std::flush;
 }
 
 
@@ -872,7 +696,7 @@ void DatasetAnnotator::spawnPed(Vector3 pos, int numPed) {
 	for (int i = 0; i<n; i++) {
 		current = ENTITY::GET_ENTITY_COORDS(ped_spawned[i], TRUE);
 		float dist = sqrt(pow(ped_spawned_coord[i].x - current.x, 2) + pow(ped_spawned_coord[i].y - current.y, 2) + pow(ped_spawned_coord[i].z - current.z, 2));
-		log_file << dist << std::endl;
+		//log_file << dist << std::endl;
 		if (dist < 1.0)
 			PED::DELETE_PED(&ped_spawned[i]);
 	}

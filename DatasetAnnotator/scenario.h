@@ -34,7 +34,7 @@ class DatasetAnnotator
 {
 public:
 	DatasetAnnotator(std::string output_path, const char* file_scenario, int max_samples, int is_night);
-	int update();
+	int update(int frame_id);
 	~DatasetAnnotator();
 
 private:
@@ -87,7 +87,7 @@ private:
 	CLSID pngClsid;
 
 	void get_2D_from_3D(Vector3 v, float *x, float *y);
-	void save_frame();																		// function used to capture frames internally, then private
+	void save_frame(int frame_id, int* Peds, int number_of_peds);																		// function used to capture frames internally, then private
 	void setCameraFixed(Vector3 coords, Vector3 rot, float cam_z, int fov);
 	void setCameraMoving(Vector3 A, Vector3 B, Vector3 C, int fov);							// function used to set the camera stuff
 	void spawnPed(Vector3 spawnAreaCenter, int numPed);										// function used to spawn pedestrians at the beginning of the scenario
