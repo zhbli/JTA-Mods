@@ -673,11 +673,20 @@ void DatasetAnnotator::save_frame() {
 	std::string save_color_path = frame_dir + "color.jpg";
 	void *buf_color; //说明：不要共用buf。有时前一个buf获取成功，后一个buf获取失败。但是共用的话你就不知道后一个失败了。
 	//抓取RGB
+	strm1 << "tag0\n" << std::flush;
 	int size_color = export_get_color_buffer(&buf_color);
-	Mat image_color(Size(width, height), CV_8UC4, buf_color, Mat::AUTO_STEP);
-	cvtColor(image_color, image_color, CV_RGB2BGR);
-	imwrite(save_color_path, image_color);
-	strm1 << "tag1\n" << std::flush;
+	if (size_color <= 0)
+	{
+		strm1 << " bug0\n" << std::flush;
+	}
+	else
+	{
+		Mat image_color(Size(width, height), CV_8UC4, buf_color, Mat::AUTO_STEP);
+		cvtColor(image_color, image_color, CV_RGB2BGR);
+		imwrite(save_color_path, image_color);
+		strm1 << "tag1\n" << std::flush;
+	}
+
 	//抓取mask
 	//显隐各人
 	//先全隐藏
