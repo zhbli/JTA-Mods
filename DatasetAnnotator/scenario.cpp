@@ -501,70 +501,82 @@ void DatasetAnnotator::save_frame(int frame_id, int *Peds, int number_of_peds) {
 	}
 	Mat image_color(Size(width, height), CV_8UC4, buf_color, Mat::AUTO_STEP);
 	cvtColor(image_color, image_color, CV_RGB2BGR);
-	imwrite(save_color_path, image_color);
+	try
+	{
+		imwrite(save_color_path, image_color);
+	}
+	catch (...)
+	{
+		log_file << size_color << " bug_color_imwrite\n" << std::flush;
+	}
 	log_file << "tag1\n" << std::flush;
 
 	//抓取mask
+	//判断这个人是否可见。
+	//如果这个人在屏幕上不可见，则什么也不做。
+	//重要更新：如果这个人在建筑后面，那么是不可见的，但开枪能打死。所以说这个人还在屏幕上。
+	//但我们不需要这个完全不可见的人。所以可以判断这个人现在是否可见。若不可见则不保存。
+	//注意，此时所有其他人都不可见，只有这个人可见。但问题是，你设置了这个人可见，那ENTITY::IS_ENTITY_VISIBLE(peds[i])一定是true吗？
+	//其实两种结果都有道理。
+	int visible[max_number_of_peds];
+	for (int i = 0; i < number_of_peds; i++) //for every ped
+	{
+		if (ENTITY::IS_ENTITY_ON_SCREEN(Peds[i]) && ENTITY::IS_ENTITY_VISIBLE(Peds[i]))
+		{
+			visible[i] = 1;
+		}
+		else
+		{
+			visible[i] = 0;
+		}
+	}
 	//显隐各人
 	//先全隐藏
 	for (int i = 0; i < number_of_peds; i++) //for every ped
 	{
 		ENTITY::SET_ENTITY_VISIBLE(Peds[i], FALSE, TRUE);//first, hide it
 	}
-	/*由于使用worldGetAllPeds，所以画面中的每个人都会被我捕获。
-	//保存背景
-	std::string save_background_path = frame_dir + "background.png"; //说明：二值图像的png比jpg小很多，且无损。
-	void *buf_bg;
-	WAIT(200);//使得显卡内容能够跟上RGB的内容。
-	int size_bg = export_get_stencil_buffer(&buf_bg);
-	if (size_bg <= 0)
-	{
-		log_file << " bug_bg" << std::flush;
-	}
-	else
-	{
-		Mat image_bg(Size(width, height), CV_8UC1, buf_bg, Mat::AUTO_STEP);
-		for (int y = 0; y < height; y++)
-		{
-			for (int x = 0; x < width; x++)
-			{
-				if (image_bg.at<uchar>(y, x) == 1)
-				{
-					image_bg.at<uchar>(y, x) = 255;
-				}
-				else
-				{
-					image_bg.at<uchar>(y, x) = 0;
-				}
-			}
-		}
-		imwrite(save_background_path, image_bg);
-		log_file << "tag2\n" << std::flush;
-	}
-	*/
+	log_file << "tag2\n" << std::flush;
+
 	//保存每个人
 	for (int i = 0; i < number_of_peds; i++) //for every ped
 	{
-		//如果这个人在屏幕上不可见，则什么也不做
-		if (!ENTITY::IS_ENTITY_ON_SCREEN(Peds[i]))
+		if (visible[i] == 0)  //如果不在屏幕上或该人不可见
 		{
 			continue;
 		}
+
 		ENTITY::SET_ENTITY_VISIBLE(Peds[i], TRUE, TRUE);//仅显示当前的人
 		WAIT(200);//必须要等待，使得人能够载入到画面中。
 		
 		//捕获mask
-		std::string save_mask_path = frame_dir + std::to_string(i) + ".png"; //说明：二值图像的png比jpg小很多，且无损。
+		std::string save_mask_path = frame_dir + std::to_string(Peds[i]) + ".png"; //说明：二值图像的png比jpg小很多，且无损。
 		void *buf_mask;
 		WAIT(200);//使得显卡内容能够跟上RGB的内容。
-		int size_mask = export_get_stencil_buffer(&buf_mask);
-		while (size_mask <= 0)
+		log_file << "--" << i << "tag3.1\n" << std::flush;
+		
+		//可能export_get_stencil_buffer会崩溃
+		int should_save_1 = 1;
+		int size_mask;
+		try
 		{
-			log_file << "--" << i << " bug_mask\n" << std::flush;
 			size_mask = export_get_stencil_buffer(&buf_mask);
-			WAIT(200);
+			while (size_mask <= 0)
+			{
+				log_file << "--" << i << " bug_mask\n" << std::flush;
+				size_mask = export_get_stencil_buffer(&buf_mask);
+				WAIT(200);
+			}
 		}
+		catch (...)
+		{
+			should_save_1 = 0;
+			log_file << "--" << i << "bug_stencil\n" << std::flush;
+		}
+		log_file << "--" << i << "tag3.2\n" << std::flush;
+		
 		Mat image(Size(width, height), CV_8UC1, buf_mask, Mat::AUTO_STEP);
+		int should_save = 0; //当图像全0时，不保存。
 		for (int y = 0; y < height; y++)
 		{
 			for (int x = 0; x < width; x++)
@@ -572,6 +584,7 @@ void DatasetAnnotator::save_frame(int frame_id, int *Peds, int number_of_peds) {
 				if (image.at<uchar>(y, x) == 1)
 				{
 					image.at<uchar>(y, x) = 255;
+					should_save = 1;
 				}
 				else
 				{
@@ -579,8 +592,21 @@ void DatasetAnnotator::save_frame(int frame_id, int *Peds, int number_of_peds) {
 				}
 			}
 		}
-		imwrite(save_mask_path, image);
-		
+		log_file << "--" << i << "tag3.3\n" << std::flush;
+
+		if (should_save == 1 || should_save_1 == 1)
+		{
+			try
+			{
+				log_file << "--" << i << "saving mask" << size_mask << "\n" << std::flush;
+				imwrite(save_mask_path, image);
+				log_file << "--" << i << "save mask finish" << size_mask << "\n" << std::flush;
+			}
+			catch (...)
+			{
+				log_file << "--" << i << size_mask << " bug_mask_imwrite\n" << std::flush;
+			}
+		}
 		ENTITY::SET_ENTITY_VISIBLE(Peds[i], FALSE, TRUE);//隐藏当前的人。此时画面中是没有任何人的。
 	}
 	//处理完该帧后，把人再全显示出来

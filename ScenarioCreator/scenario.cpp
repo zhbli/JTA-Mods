@@ -15,7 +15,7 @@ int logLenght = 100;
 char *logString = (char*)malloc(logLenght * sizeof(char));
 
 FILE *f;
-const char *filesPath = "JTA-Scenarios\\";
+const char *filesPath = "AmodalMOTS-Scenarios\\";
 char fileName[20] = "None";
 int nFiles = 0, currentFile = 1;
 
